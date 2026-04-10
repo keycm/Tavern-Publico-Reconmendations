@@ -38,6 +38,7 @@ mysqli_close($link);
     <title>Tavern Publico - Customer Database</title>
     <link rel="stylesheet" href="CSS/admin.css">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
     <style>
         /* --- ENHANCED & RESPONSIVE UI STYLING --- */
 
@@ -54,6 +55,12 @@ mysqli_close($link);
             border-radius: 10px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.03);
             border: 1px solid #eaedf1;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
         }
 
         .search-input {
@@ -139,6 +146,9 @@ mysqli_close($link);
         .btn-primary { background-color: #28a745; color: white; box-shadow: 0 4px 6px rgba(40,167,69,0.2); }
         .btn-primary:hover { background-color: #218838; transform: translateY(-1px); }
 
+        .btn-info { background-color: #0284c7; color: white; box-shadow: 0 4px 6px rgba(2,132,199,0.2); }
+        .btn-info:hover { background-color: #0369a1; transform: translateY(-1px); }
+
         .view-edit-btn { background-color: #e0f2fe; color: #0284c7; }
         .view-edit-btn:hover { background-color: #bae6fd; }
         
@@ -163,6 +173,7 @@ mysqli_close($link);
         
         #userModal .modal-content { max-width: 500px; }
         #managerPermissionsModal .modal-content { max-width: 600px; }
+        #emailBlastModal .modal-content { max-width: 750px; } /* Wider for WYSIWYG */
         
         .modal-header { padding: 20px 25px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; background-color: #fafbfc; }
         .modal-header h2 { margin: 0; font-size: 18px; color: #2c3e50; font-weight: 700; }
@@ -175,47 +186,25 @@ mysqli_close($link);
         /* Form Inputs */
         .form-group { margin-bottom: 18px; }
         .form-group label { display: block; margin-bottom: 8px; font-weight: 600; color: #444; font-size: 14px; }
-        .form-group input { width: 100%; padding: 12px 15px; border: 1px solid #d1d5db; border-radius: 6px; font-family: inherit; font-size: 14px; box-sizing: border-box; transition: border-color 0.2s; background: #fdfdfd; }
-        .form-group input:focus { border-color: #007bff; outline: none; box-shadow: 0 0 0 3px rgba(0,123,255,0.1); }
+        .form-group input, .form-group select { width: 100%; padding: 12px 15px; border: 1px solid #d1d5db; border-radius: 6px; font-family: inherit; font-size: 14px; box-sizing: border-box; transition: border-color 0.2s; background: #fdfdfd; }
+        .form-group input:focus, .form-group select:focus { border-color: #007bff; outline: none; box-shadow: 0 0 0 3px rgba(0,123,255,0.1); }
         small#passwordHelp { display: block; margin-top: 6px; color: #777; font-size: 12px; }
 
         .modal-save-btn { background-color: #007bff; color: white; padding: 10px 20px; font-size: 14px; }
         .modal-save-btn:hover { background-color: #0056b3; }
 
-        /* --- Styles for New Manager Permissions Modal --- */
-        .permission-group { margin-top: 5px; }
-        .permission-item { display: flex; align-items: center; padding: 18px 0; border-bottom: 1px solid #f1f3f5; gap: 20px; }
-        .permission-item:last-child { border-bottom: none; padding-bottom: 0; }
-        .permission-icon { display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 2em; color: #0284c7; width: 45px; height: 45px; background: #e0f2fe; border-radius: 50%; }
-        
-        .permission-text { flex-grow: 1; }
-        .permission-text label { font-size: 15px; font-weight: 600; color: #333; display: block; margin-bottom: 4px; cursor: pointer; }
-        .permission-text p { font-size: 13px; color: #666; margin: 0; line-height: 1.5; }
-        .permission-toggle { flex-shrink: 0; }
-        
-        /* Toggle Switch CSS */
-        .toggle-switch { height: 0; width: 0; visibility: hidden; position: absolute; }
-        .toggle-switch + label { cursor: pointer; text-indent: -9999px; width: 48px; height: 26px; background: #d1d5db; display: block; border-radius: 100px; position: relative; transition: background-color 0.3s; }
-        .toggle-switch + label:after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; background: #fff; border-radius: 90px; transition: 0.3s cubic-bezier(0.4, 0.0, 0.2, 1); box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
-        .toggle-switch:checked + label { background: #10b981; }
-        .toggle-switch:checked + label:after { left: calc(100% - 3px); transform: translateX(-100%); }
-        .toggle-switch + label:active:after { width: 26px; }
-
-        /* Loading Spinner */
-        .btn-loading { position: relative; color: transparent !important; cursor: wait; pointer-events: none; }
-        .btn-loading::after { content: ''; position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; margin-left: -9px; margin-top: -9px; border: 2px solid rgba(255,255,255,0.5); border-top-color: #fff; border-radius: 50%; animation: spin 0.8s linear infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
+        /* Quill Editor overrides */
+        #editor-container { background-color: #fff; border-bottom-left-radius: 6px; border-bottom-right-radius: 6px; }
+        .ql-toolbar.ql-snow { border-top-left-radius: 6px; border-top-right-radius: 6px; background: #f8f9fa; }
 
         /* --- RESPONSIVE MEDIA QUERIES --- */
         @media screen and (max-width: 768px) {
             .reservation-page-header { flex-direction: column; align-items: stretch; }
             .search-input { width: 100%; }
-            #addNewUserBtn { width: 100%; }
+            .header-actions { flex-direction: column; width: 100%; }
+            #addNewUserBtn, #sendEmailBlastBtn { width: 100%; }
             .actions { flex-direction: column; }
             .btn.btn-small { width: 100%; justify-content: flex-start; }
-            .permission-item { flex-direction: column; align-items: flex-start; text-align: center; gap: 10px; }
-            .permission-icon { margin: 0 auto; }
-            .permission-toggle { align-self: center; margin-top: 10px; }
         }
     </style>
 </head>
@@ -300,7 +289,11 @@ mysqli_close($link);
             <main class="dashboard-main-content">
                 <div class="reservation-page-header">
                     <input type="text" id="userSearch" class="search-input" placeholder="Search customers by name, email, or role...">
-                    <button id="addNewUserBtn" class="btn btn-primary"><i class="material-icons">person_add</i> Add New Customer</button>
+                    
+                    <div class="header-actions">
+                        <button id="addNewUserBtn" class="btn btn-primary"><i class="material-icons">person_add</i> Add New Customer</button>
+                        <button id="sendEmailBlastBtn" class="btn btn-info"><i class="material-icons">forward_to_inbox</i> Send Email Blast</button>
+                    </div>
                 </div>
 
                 <section class="all-reservations-section">
@@ -399,6 +392,44 @@ mysqli_close($link);
                     </div>
                 </div>
             </div>
+
+            <div id="emailBlastModal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2 id="emailModalTitle">Send Email Update / Promo</h2>
+                        <button class="close-button">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="emailBlastForm">
+                            <div class="form-group">
+                                <label for="emailTarget">Send To:</label>
+                                <select id="emailTarget" name="emailTarget">
+                                    <option value="all">All Verified Customers</option>
+                                    <option value="specific">Specific Customer(s)</option>
+                                </select>
+                            </div>
+                            <div class="form-group" id="specificEmailGroup" style="display: none;">
+                                <label for="specificEmails">Specific Email(s):</label>
+                                <input type="text" id="specificEmails" name="specificEmails" placeholder="e.g. user1@example.com, user2@example.com">
+                                <small style="color: #777; display:block; margin-top:5px;">Separate multiple emails with commas.</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="emailSubject">Subject:</label>
+                                <input type="text" id="emailSubject" name="subject" placeholder="e.g. Special Promo: 20% Off This Weekend!" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Message Content:</label>
+                                <div id="editor-container" style="height: 250px;"></div>
+                                <input type="hidden" id="emailBody" name="body">
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn" id="cancelEmailBtn" style="background-color: #f3f4f6; color: #4b5563; border: 1px solid #d1d5db;">Cancel</button>
+                        <button type="submit" class="btn modal-save-btn btn-info" id="emailSubmitBtn" form="emailBlastForm"><i class="material-icons" style="font-size: 18px; margin-right: 5px; vertical-align: bottom;">send</i> Send Email</button>
+                    </div>
+                </div>
+            </div>
             
             <div id="managerPermissionsModal" class="modal">
                 <div class="modal-content">
@@ -486,11 +517,126 @@ mysqli_close($link);
         </div>
     </div>
 
-
+    <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
     <script src="JS/customer_database.js"></script>
+    
     <script>
     document.addEventListener('DOMContentLoaded', () => {
         
+        // --- QUILL RICH TEXT EDITOR INITIALIZATION ---
+        var quill = new Quill('#editor-container', {
+            theme: 'snow',
+            placeholder: 'Compose your email message here...',
+            modules: {
+                toolbar: [
+                    [{ 'font': [] }, { 'size': ['small', false, 'large', 'huge'] }],
+                    [{ 'color': [] }, { 'background': [] }],
+                    ['bold', 'italic', 'underline', 'strike'],
+                    [{ 'header': 1 }, { 'header': 2 }],
+                    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                    [{ 'align': [] }],
+                    ['link', 'image'],
+                    ['clean'] // remove formatting button
+                ]
+            }
+        });
+
+        // --- EMAIL BLAST MODAL LOGIC ---
+        const emailBlastModal = document.getElementById('emailBlastModal');
+        const sendEmailBlastBtn = document.getElementById('sendEmailBlastBtn');
+        const cancelEmailBtn = document.getElementById('cancelEmailBtn');
+        const emailTarget = document.getElementById('emailTarget');
+        const specificEmailGroup = document.getElementById('specificEmailGroup');
+        const specificEmails = document.getElementById('specificEmails');
+        const emailBlastForm = document.getElementById('emailBlastForm');
+        
+        // Open Modal
+        if(sendEmailBlastBtn) {
+            sendEmailBlastBtn.addEventListener('click', () => {
+                emailBlastModal.style.display = 'flex';
+            });
+        }
+
+        // Close Modal via Cancel or "X"
+        if(cancelEmailBtn) {
+            cancelEmailBtn.addEventListener('click', () => {
+                emailBlastModal.style.display = 'none';
+            });
+        }
+        const emailModalClose = emailBlastModal.querySelector('.close-button');
+        if(emailModalClose) {
+            emailModalClose.addEventListener('click', () => {
+                emailBlastModal.style.display = 'none';
+            });
+        }
+
+        // Toggle "Specific Email" input based on selection
+        emailTarget.addEventListener('change', (e) => {
+            if(e.target.value === 'specific') {
+                specificEmailGroup.style.display = 'block';
+                specificEmails.setAttribute('required', 'required');
+            } else {
+                specificEmailGroup.style.display = 'none';
+                specificEmails.removeAttribute('required');
+            }
+        });
+
+        // Handle Email Form Submission
+        emailBlastForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // Extract the rich HTML from the Quill editor
+            const htmlContent = document.querySelector('#editor-container .ql-editor').innerHTML;
+            document.getElementById('emailBody').value = htmlContent;
+
+            // Simple validation to ensure it's not entirely empty
+            if (quill.getText().trim().length === 0) {
+                showNotification('error', 'Validation Error', 'The email message body cannot be empty.');
+                return;
+            }
+
+            const formData = new FormData(emailBlastForm);
+            
+            // Visual loading state for the submit button
+            const submitBtn = document.getElementById('emailSubmitBtn');
+            const originalText = submitBtn.innerHTML;
+            submitBtn.innerHTML = '<i class="material-icons" style="font-size: 18px; margin-right: 5px; vertical-align: bottom;">autorenew</i> Sending...';
+            submitBtn.disabled = true;
+
+            try {
+                // ***************************************************************
+                // IMPORTANT: You will need to create `send_email_blast.php` on
+                // your server that accepts this POST data and runs PHPMailer.
+                // ***************************************************************
+                const response = await fetch('send_email_blast.php', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showNotification('success', 'Emails Sent', 'Your update/promo was sent successfully.', () => {
+                        emailBlastModal.style.display = 'none';
+                        emailBlastForm.reset();
+                        quill.setContents([]); // Clear editor
+                        emailTarget.dispatchEvent(new Event('change')); // reset dropdown UI
+                    });
+                } else {
+                    showNotification('error', 'Send Failed', result.message || 'Failed to send emails.');
+                }
+            } catch (error) {
+                console.error('Email action error:', error);
+                // Notification shows a reminder about the missing backend file if it fails locally
+                showNotification('error', 'Error', 'Failed to communicate with the server. Ensure send_email_blast.php has been created to process the emails.');
+            } finally {
+                submitBtn.innerHTML = originalText;
+                submitBtn.disabled = false;
+            }
+        });
+
+
+        // --- EXISTING NOTIFICATION LOGIC ---
         const notificationModal = document.getElementById('alertModal');
         const modalHeaderIcon = document.getElementById('modalHeaderIcon'); 
         const modalTitle = document.getElementById('alertModalTitle');
