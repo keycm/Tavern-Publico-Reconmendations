@@ -14,7 +14,7 @@ if (isset($_SESSION['loggedin']) && $_SESSION['loggedin'] === true) {
 }
 
 if (!$is_authorized) {
-    header('Location: login.php'); 
+    header('Location: login'); 
     exit;
 }
 
@@ -35,6 +35,16 @@ if ($result = mysqli_query($link, $sql_testimonials)) {
         $testimonials[] = $row;
     }
 }
+
+// Fetch verified users for the Email Blast Multi-Select Dropdown
+$verified_users = [];
+$sql_verified = "SELECT email, username FROM users WHERE is_verified = 1 AND deleted_at IS NULL ORDER BY username ASC";
+if ($result = mysqli_query($link, $sql_verified)) {
+    while ($row = mysqli_fetch_assoc($result)) {
+        $verified_users[] = $row;
+    }
+}
+
 mysqli_close($link);
 ?>
 <!DOCTYPE html>
@@ -45,6 +55,8 @@ mysqli_close($link);
     <title>Tavern Publico - Notification Control</title>
     <link rel="stylesheet" href="CSS/admin.css">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     <style>
         .tabs-container { display: flex; border-bottom: 2px solid #e0e0e0; margin-bottom: 25px; gap: 5px; }
         .tab-button { padding: 12px 24px; cursor: pointer; border: none; background-color: transparent; font-size: 15px; font-weight: 600; color: #666; text-decoration: none; border-top-left-radius: 8px; border-top-right-radius: 8px; margin-bottom: -2px; display: flex; align-items: center; gap: 8px; transition: all 0.3s ease; }
@@ -88,8 +100,8 @@ mysqli_close($link);
         .close-button:hover { color: #333; }
         .form-group { margin-bottom: 15px; }
         .form-group label { display: block; margin-bottom: 8px; font-weight: 600; color: #444; font-size: 14px; }
-        .form-group textarea, .form-group input { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 6px; font-family: inherit; font-size: 14px; resize: vertical; box-sizing: border-box; }
-        .form-group textarea:focus, .form-group input:focus { border-color: #007bff; outline: none; }
+        .form-group textarea, .form-group input, .form-group select { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 6px; font-family: inherit; font-size: 14px; resize: vertical; box-sizing: border-box; }
+        .form-group textarea:focus, .form-group input:focus, .form-group select:focus { border-color: #007bff; outline: none; }
         #readMoreBody { white-space: pre-wrap; text-align: left; background-color: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #e9ecef; line-height: 1.6; color: #333; margin: 0; }
         .modal-save-btn { background-color: #007bff; color: white; padding: 10px 20px; font-size: 14px; }
         .modal-save-btn:hover { background-color: #0056b3; }
@@ -102,6 +114,41 @@ mysqli_close($link);
         .page-number:hover { background-color: #e9ecef; color: #212529; }
         .page-number.active { background-color: #007bff; color: white; border-color: #007bff; font-weight: 600; }
         .pagination-container .btn:disabled { background-color: #f8f9fa; color: #adb5bd; border: 1px solid #dee2e6; cursor: not-allowed; }
+
+        /* Quill Editor overrides */
+        #editor-container { background-color: #fff; border-bottom-left-radius: 6px; border-bottom-right-radius: 6px; }
+        .ql-toolbar.ql-snow { border-top-left-radius: 6px; border-top-right-radius: 6px; background: #f8f9fa; }
+
+        /* Select2 Theme Overrides to Match UI */
+        .select2-container--default .select2-selection--multiple {
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            padding: 4px;
+            min-height: 44px;
+        }
+        .select2-container--default.select2-container--focus .select2-selection--multiple {
+            border-color: #007bff;
+            box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.15);
+        }
+        .select2-container--default .select2-selection--multiple .select2-selection__choice {
+            background-color: #e0f2fe;
+            border: 1px solid #bae6fd;
+            color: #0284c7;
+            border-radius: 4px;
+            padding: 4px 8px;
+            margin-top: 4px;
+            font-size: 13px;
+        }
+        .select2-container--default .select2-selection--multiple .select2-selection__choice__remove {
+            color: #0284c7;
+            margin-right: 6px;
+            border-right: none;
+        }
+        .select2-container--default .select2-selection--multiple .select2-selection__choice__remove:hover {
+            background-color: transparent;
+            color: #0369a1;
+        }
+
         @media screen and (max-width: 768px) {
             .tabs-container { flex-direction: column; background: #f8f9fa; border-radius: 8px; padding: 5px; border-bottom: none; }
             .tab-button { width: 100%; justify-content: center; border-radius: 6px; margin-bottom: 2px; }
@@ -181,9 +228,10 @@ mysqli_close($link);
                 <div class="tabs-container">
                     <button class="tab-button active" onclick="openTab(event, 'messages')"><i class="material-icons">email</i><span>Contact Messages</span></button>
                     <button class="tab-button" onclick="openTab(event, 'testimonials')"><i class="material-icons">star_rate</i><span>Guest Testimonials</span></button>
+                    <button class="tab-button" onclick="openTab(event, 'email_blast')"><i class="material-icons">forward_to_inbox</i><span>Email Blast</span></button>
                 </div>
 
-                <div id="messages" class="tab-content">
+                <div id="messages" class="tab-content active">
                     <div class="reservation-page-header">
                         <h2>Contact Form Messages</h2>
                         <input type="text" id="messageSearch" class="search-input" placeholder="Search messages...">
@@ -274,6 +322,44 @@ mysqli_close($link);
                         </div>
                     </section>
                 </div>
+                
+                <div id="email_blast" class="tab-content">
+                    <div class="reservation-page-header">
+                        <h2>Send Email Update / Promo</h2>
+                    </div>
+                    <section class="all-reservations-section" style="padding: 20px; background: transparent; border: none; box-shadow: none;">
+                        <form id="emailBlastForm" style="max-width: 800px; margin: 0 auto; background: #fff; padding: 25px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); border: 1px solid #eaedf1;">
+                            <div class="form-group">
+                                <label for="emailTarget">Send To:</label>
+                                <select id="emailTarget" name="emailTarget">
+                                    <option value="all">All Verified Customers</option>
+                                    <option value="specific">Specific Customer(s)</option>
+                                </select>
+                            </div>
+                            <div class="form-group" id="specificEmailGroup" style="display: none;">
+                                <label for="specificEmails">Select Specific Customer(s):</label>
+                                <select id="specificEmails" name="specificEmails[]" multiple="multiple" style="width: 100%;">
+                                    <?php foreach ($verified_users as $vu): ?>
+                                        <option value="<?= htmlspecialchars($vu['email']) ?>"><?= htmlspecialchars($vu['username']) ?> (<?= htmlspecialchars($vu['email']) ?>)</option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <small style="color: #777; display:block; margin-top:5px;">Click to select multiple customers. You can also type to search.</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="emailSubject">Subject:</label>
+                                <input type="text" id="emailSubject" name="subject" placeholder="e.g. Special Promo: 20% Off This Weekend!" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Message Content:</label>
+                                <div id="editor-container" style="height: 300px;"></div>
+                                <input type="hidden" id="emailBody" name="body">
+                            </div>
+                            <div class="form-actions" style="margin-top: 20px; text-align: right;">
+                                <button type="submit" class="btn btn-info" id="emailSubmitBtn" style="background-color: #0284c7; color: white; padding: 10px 25px; font-size: 15px; border-radius: 6px;"><i class="material-icons" style="font-size: 18px; margin-right: 5px; vertical-align: bottom;">send</i> Send Email</button>
+                            </div>
+                        </form>
+                    </section>
+                </div>
             </main>
         </div>
     </div>
@@ -323,6 +409,8 @@ mysqli_close($link);
     </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
     // Tab Logic
     function openTab(evt, tabName) {
@@ -342,7 +430,104 @@ mysqli_close($link);
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-        document.querySelector('.tab-button.active').click();
+        // Initialize Select2 for the dynamic email chooser
+        $('#specificEmails').select2({
+            placeholder: "Search and select customers...",
+            allowClear: true
+        });
+
+        // Init Quill Editor
+        var quill = new Quill('#editor-container', {
+            theme: 'snow',
+            placeholder: 'Compose your email message here...',
+            modules: {
+                toolbar: [
+                    [{ 'font': [] }, { 'size': ['small', false, 'large', 'huge'] }],
+                    [{ 'color': [] }, { 'background': [] }],
+                    ['bold', 'italic', 'underline', 'strike'],
+                    [{ 'header': 1 }, { 'header': 2 }],
+                    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                    [{ 'align': [] }],
+                    ['link', 'image'],
+                    ['clean']
+                ]
+            }
+        });
+
+        // Email Blast Form Logic
+        const emailTarget = document.getElementById('emailTarget');
+        const specificEmailGroup = document.getElementById('specificEmailGroup');
+        const emailBlastForm = document.getElementById('emailBlastForm');
+
+        if(emailTarget) {
+            emailTarget.addEventListener('change', (e) => {
+                if(e.target.value === 'specific') {
+                    specificEmailGroup.style.display = 'block';
+                } else {
+                    specificEmailGroup.style.display = 'none';
+                    $('#specificEmails').val(null).trigger('change'); // Clear selections when hiding
+                }
+            });
+        }
+
+        if(emailBlastForm) {
+            emailBlastForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const htmlContent = document.querySelector('#editor-container .ql-editor').innerHTML;
+                document.getElementById('emailBody').value = htmlContent;
+
+                if (quill.getText().trim().length === 0) {
+                    showAlert('Error', 'The email message body cannot be empty.');
+                    return;
+                }
+
+                const formData = new FormData(emailBlastForm);
+                
+                // MULTI-SELECT FORMATTING: Ensure it parses seamlessly with your backend
+                if(emailTarget.value === 'specific') {
+                    const selectedEmails = $('#specificEmails').val();
+                    if(!selectedEmails || selectedEmails.length === 0) {
+                        showAlert('Error', 'Please select at least one customer.');
+                        return;
+                    }
+                    formData.delete('specificEmails[]');
+                    formData.append('specificEmails', selectedEmails.join(','));
+                }
+
+                const submitBtn = document.getElementById('emailSubmitBtn');
+                const originalText = submitBtn.innerHTML;
+                submitBtn.innerHTML = '<i class="material-icons" style="font-size: 18px; margin-right: 5px; vertical-align: bottom;">autorenew</i> Sending...';
+                submitBtn.disabled = true;
+
+                try {
+                    // FIXED URL: Removed .php extension here so .htaccess doesn't trigger a 301 redirect and wipe the POST data
+                    const response = await fetch('send_email_blast', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        showAlert('Success', result.message || 'Your update/promo was sent successfully.', () => {
+                            emailBlastForm.reset();
+                            quill.setContents([]);
+                            $('#specificEmails').val(null).trigger('change'); // Reset Select2 UI
+                            emailTarget.dispatchEvent(new Event('change'));
+                        });
+                    } else {
+                        showAlert('Error', result.message || 'Failed to send emails.');
+                    }
+                } catch (error) {
+                    console.error('Email action error:', error);
+                    showAlert('Error', 'Failed to communicate with the server.');
+                } finally {
+                    submitBtn.innerHTML = originalText;
+                    submitBtn.disabled = false;
+                }
+            });
+        }
 
         // -------------------------------------------------------------
         // COMBINED AND CLEANED MODAL & NOTIFICATION JAVASCRIPT
@@ -395,7 +580,6 @@ mysqli_close($link);
             });
         }
 
-        // Close Universal Modal
         alertModal.on('click', '.close-button', function() { alertModal.css('display', 'none'); });
         
         // --- Admin Top Dropdown Notifications ---
@@ -408,7 +592,6 @@ mysqli_close($link);
 
         async function fetchAdminNotifications() {
             try {
-                // FIXED: URL WITHOUT .PHP TO PREVENT .HTACCESS 301 REDIRECTS
                 const response = await fetch('get_admin_notifications'); 
                 const data = await response.json();
                 if (data.success) {
@@ -434,7 +617,6 @@ mysqli_close($link);
             if (reservationDropdown) reservationDropdown.classList.remove('show');
             if (adminProfileDropdown) adminProfileDropdown.classList.remove('show'); 
             
-            // Close modals when clicking outside
             if (event.target.classList.contains('modal')) {
                 event.target.style.display = 'none';
             }
@@ -448,7 +630,6 @@ mysqli_close($link);
                     formData.append('id', e.target.dataset.id);
                     formData.append('type', e.target.dataset.type);
                     try {
-                        // FIXED: URL WITHOUT .PHP TO PREVENT .HTACCESS 301 REDIRECTS
                         const response = await fetch('clear_admin_notification', { method: 'POST', body: formData }); 
                         const result = await response.json();
                         if (result.success) {
@@ -468,14 +649,13 @@ mysqli_close($link);
         // -------------------------------------------------------------
         $('#testimonialsTableBody').on('click', '.feature-btn', function() {
             var btn = $(this);
-            var testimonialId = btn.closest('tr').attr('data-id'); // Using attr to bypass cache issues
+            var testimonialId = btn.closest('tr').attr('data-id'); 
             var isCurrentlyFeatured = btn.data('featured') == 1;
             var actionText = isCurrentlyFeatured ? 'un-feature' : 'feature';
 
             showConfirm('Confirm Action', `Are you sure you want to ${actionText} this testimonial?`, function(confirmed) {
                 if (confirmed) {
                     $.ajax({
-                        // FIXED: URL WITHOUT .PHP
                         url: 'manage_testimonial',
                         type: 'POST',
                         data: { action: 'feature', testimonial_id: testimonialId },
@@ -501,7 +681,6 @@ mysqli_close($link);
             showConfirm('Confirm Deletion', 'Move this testimonial to the deletion history?', function(confirmed) {
                 if (confirmed) {
                     $.ajax({
-                        // FIXED: URL WITHOUT .PHP
                         url: 'manage_testimonial',
                         type: 'POST',
                         data: { action: 'delete', testimonial_id: testimonialId },
@@ -536,7 +715,6 @@ mysqli_close($link);
             showConfirm('Confirm Deletion', 'Move this message to the deletion history?', function(confirmed) {
                 if (confirmed) {
                     $.ajax({
-                        // FIXED: URL WITHOUT .PHP
                         url: 'manage_message',
                         type: 'POST',
                         data: { action: 'delete', message_id: messageId },
@@ -563,7 +741,6 @@ mysqli_close($link);
             submitBtn.addClass('btn-loading');
 
             $.ajax({
-                // FIXED: URL WITHOUT .PHP
                 url: 'manage_message', 
                 type: 'POST', 
                 data: formData, 
